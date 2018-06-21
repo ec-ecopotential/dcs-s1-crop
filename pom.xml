@@ -11,7 +11,7 @@
     <version>2.0.0</version>
   </parent>
   <description>Sentinel1 data selection over a PA and related cropping</description>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0</version>
   <properties>
     <summary>Sentinel1 data selection over a PA and related cropping</summary>
     <description>Sentinel1 data selection over a PA and related cropping</description>
@@ -63,10 +63,10 @@
     <profile>
       <id>package-app</id>
       <activation>
-         <property>
-           <name>env</name>
-           <value>ci</value>
-         </property>
+        <property>
+          <name>env</name>
+          <value>ci</value>
+        </property>
       </activation>
       <build>
         <plugins>
@@ -109,7 +109,7 @@
                     <require>miniconda</require>
                     <require>OTB</require>
                     <require>java-1.8.0-openjdk-devel</require>
-                    <require>snap6</require> 
+                    <require>snap6</require>
                   </requires>
                   <postinstallScriptlet combine.self="override">
                     <script>conda update conda -y &amp;&amp; conda install -y --file /application/dependencies/python/packages.list</script>
