@@ -11,7 +11,7 @@
     <version>3.0.0-docker</version>
   </parent>
   <description>Sentinel1 data selection over a PA and related cropping</description>
-  <version>1.0</version>
+  <version>1.1</version>
   <properties>
     <summary>Sentinel1 data selection over a PA and related cropping</summary>
     <description>Sentinel1 data selection over a PA and related cropping</description>
@@ -47,7 +47,7 @@
                   <goal>exec</goal>
                 </goals>
                 <configuration>
-                  <executable>app_descriptor_generator</executable>
+                  <executable>/opt/anaconda/bin/app_descriptor_generator</executable>
                   <arguments>
                     <argument>${basedir}/src/main/app-resources/application_template.xml</argument>
                     <argument>${basedir}/src/main/app-resources/application.xml</argument>
@@ -72,29 +72,6 @@
         <plugins>
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <version>1.3.1</version>
-            <executions>
-              <execution>
-                <id>application.xml generation</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <configuration>
-                  <executable>app_descriptor_generator</executable>
-                  <arguments>
-                    <argument>${basedir}/src/main/app-resources/application_template.xml</argument>
-                    <argument>${basedir}/src/main/app-resources/application.xml</argument>
-                    <argument>${basedir}/src/main/app-resources/notebook/libexec/input.ipynb</argument>
-                  </arguments>
-                  <!--<outputFile>${basedir}/src/main/app-resources/dependencies/python/packages.list</outputFile>-->
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
             <artifactId>rpm-maven-plugin</artifactId>
             <executions>
               <execution>
@@ -105,14 +82,12 @@
                 <configuration>
                   <!-- Set here the dependencies installed with 'sudo yum install'-->
                   <requires>
-                    <require>fftw</require>
                     <require>miniconda</require>
-                    <require>OTB</require>
                     <require>java-1.8.0-openjdk-devel</require>
-                    <require>snap6</require>
+                    <require>snap</require>
                   </requires>
                   <postinstallScriptlet combine.self="override">
-                    <script>conda update conda -y &amp;&amp; conda install -y --file /application/dependencies/python/packages.list</script>
+                    <script>conda update conda -y &amp;&amp; conda install -y --file /application/dependencies/python/packages.list; cp /application/notebook/etc/snappy.ini /opt/anaconda/lib/python2.7/site-packages/snappy/snappy.ini</script>
                   </postinstallScriptlet>
                 </configuration>
               </execution>
