@@ -11,7 +11,7 @@
     <version>2.0.0</version>
   </parent>
   <description>Sentinel1 data selection over a PA and related cropping</description>
-  <version>1.0</version>
+  <version>1.1</version>
   <properties>
     <summary>Sentinel1 data selection over a PA and related cropping</summary>
     <description>Sentinel1 data selection over a PA and related cropping</description>
