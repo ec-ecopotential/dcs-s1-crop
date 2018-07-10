@@ -7,7 +7,7 @@ node('ci-community') {
   env.PATH = "${tool 'apache-maven-3.0.5'}/bin:${env.PATH}"
   
   stage 'Package and Deploy'
-  sh 'mvn deploy -Drelease=true'
+  sh 'mvn deploy'
 
 }
 
