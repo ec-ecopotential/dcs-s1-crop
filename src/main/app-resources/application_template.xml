@@ -14,7 +14,7 @@
     <node id="notebook">
       <job id="notebook"/>
       <sources>
-        <source id="source" title="Input references" abstract="Input references" refid="string:list" scope="runtime"></source>
+        <source id="source" title="Input PA series" abstract="Input PA series" refid="string:list" scope="runtime"></source>
       </sources>
     </node>
   </workflow>

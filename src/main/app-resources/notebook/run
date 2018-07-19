@@ -6,6 +6,7 @@ sys.setdefaultencoding('utf8')
 import os
 import io
 import shutil
+import urllib
 import atexit
 from nbconvert.preprocessors import ExecutePreprocessor, CellExecutionError
 import nbformat as nbf
@@ -55,7 +56,7 @@ def clean_exit(exit_code):
  
     ciop.log(log_level, msg[exit_code])  
     
-def parametrize(identifier, reference, wkt):
+def parametrize(identifier, pa_series, wkt, pa_name, ftp_server_address):
     
     global nb
     
@@ -78,13 +79,22 @@ def parametrize(identifier, reference, wkt):
                         cell['source'] = 'input_identifier = \'%s\'' % identifier  
                 
                     if names[0] == 'input_reference':
-                        ciop.log('INFO', 'cell %s updated with \'input_reference\' value %s' % (index, reference))
-                        cell['source'] = 'input_reference = \'%s\'' % reference
-                    
-                    if names[0] == 'input_reference_wkt':
-                        ciop.log('INFO', 'cell %s updated with \'input_reference_wkt\' value %s' % (index, wkt))
-                        cell['source'] = 'input_reference_wkt = \'%s\'' % wkt 
+                        ciop.log('INFO', 'cell %s updated with \'input_reference\' value %s' % (index, pa_series))
+                        cell['source'] = 'input_reference = \'%s\'' % pa_series
+                        
+                    if names[0] == 'input_identifier_wkt':
+                        ciop.log('INFO', 'cell %s updated with \'input_identifier_wkt\' value %s' % (index, wkt))
+                        cell['source'] = 'input_identifier_wkt = \'%s\'' % wkt
                 
+                    if names[0] == 'input_pa_name':
+                        ciop.log('INFO', 'cell %s updated with \'input_pa_name\' value %s' % (index, pa_name))
+                        cell['source'] = 'input_pa_name = \'%s\'' % pa_name
+                        
+                    if names[0] == 'input_ftp_server_address':
+                        ciop.log('INFO', 'cell %s updated with \'input_ftp_server_address\' value %s' % (index, ftp_server_address))
+                        cell['source'] = 'input_ftp_server_address = \'%s\'' % ftp_server_address
+                        
+                        
                 if len(names) != 2:
                     continue
                 
@@ -139,7 +149,6 @@ ciop = cioppy.Cioppy()"""))
     code.append(nbf.v4.new_code_cell('tmp_dir = "' + tmp_dir + '"'))
     code.append(nbf.v4.new_code_cell('os.makedirs(tmp_dir)'))
     
-    #for reference in references:
     code.append(nbf.v4.new_code_cell('reference = "' + reference + '"'))
     code.append(nbf.v4.new_code_cell("search = ciop.search(end_point = reference, params = [], output_fields='enclosure,identifier', model='GeoTime')"))
     code.append(nbf.v4.new_code_cell("retrieved = ciop.copy(search[0]['enclosure'], tmp_dir)"))
@@ -150,7 +159,6 @@ ciop = cioppy.Cioppy()"""))
     with open(fname, 'w') as f:
         nbf.write(nb_stagein, f)
     
-    #ciop.publish('stage-in.ipynb', metalink=True)
 
 def stage_in(reference):
    
@@ -158,10 +166,8 @@ def stage_in(reference):
     assert(search), sys.exit(ERR_RESOLUTION)
   
     ciop.log('INFO', 'Retrieving %s from %s' % (search[0]['identifier'], search[0]['enclosure']))  
-    #if extract == 'False':
+
     retrieved = ciop.copy(search[0]['enclosure'], tmp_dir, False)
-    #else:
-    #    retrieved = ciop.copy(search[0]['enclosure'], tmp_dir)
         
     assert(retrieved), sys.exit(ERR_STAGEIN)
     
@@ -170,7 +176,7 @@ def stage_in(reference):
     local_files.append(retrieved)        
     
     
-def execute(identifier, reference, wkt, nb_source, nb_target, kernel = 'python2'):
+def execute(identifier, pa_series, wkt, pa_name, ftp_server_address, nb_source, nb_target, kernel = 'python2'):
     
     global nb
    
@@ -178,7 +184,7 @@ def execute(identifier, reference, wkt, nb_source, nb_target, kernel = 'python2'
     
     ciop.log('INFO', 'Execute notebook')
     
-    parametrize(identifier, reference, wkt)
+    parametrize(identifier, pa_series, wkt, pa_name, ftp_server_address)
     
     # execute the notebook
     ep = ExecutePreprocessor(timeout=None, kernel_name=kernel)
@@ -308,10 +314,7 @@ def catalog_publish(reference, product, index, hostname, remote_path, username, 
 def ecop_publish(runtime, reference, ftp_server, ftp_user, ftp_passwd, base_path, pa_name, index, username, api_key):
 
     exit_value = 0
-    #regexp = 'S1._.._...._...._([0-9]{4})([0-9]{2})([0-9]{2})T(.*)_PA_(.*)_(.*)$'
-    #regexp0 = '(S1.*)_PA_.*$'
     
-    #if crop_flag == 'False':
     regexp = 'S1._.._...._...._([0-9]{4})([0-9]{2})([0-9]{2})T(.*)$'
     regexp0 = '(S1.*).*.zip$'
     
@@ -385,15 +388,12 @@ def main():
     os.makedirs(tmp_dir)
     start = ciop.getparam('start')
     stop = ciop.getparam('stop')
+    time_filter_type = ciop.getparam('time_filter_type')
     cat_index = ciop.getparam('cat_index')
     config_url = ciop.getparam('config_url')
     username = ciop.getparam('username')
     api_key = ciop.getparam('api_key')
-    pa_wkt = ciop.getparam('pa_wkt')
-    pa_name = ciop.getparam('pa_name')
-    spatialCover = ciop.getparam('spatialCover')
-    #crop_flag = ciop.getparam('crop_flag')
-    
+    base_endpoint = ciop.getparam('base_endpoint')
 
     try:
         r = requests.get(config_url, headers={"X-JFrog-Art-Api":api_key, 'User-Agent': 'curl/t2Client'})
@@ -420,22 +420,41 @@ def main():
         ciop.log('ERROR', 'An error occurred while getting ftp config:\n %s' %e)
         raise SystemExit(RUNTIME_ERR)
     
-    params = dict([('start', start),
-                   ('stop', stop),
-                   ('geom', pa_wkt),
-                   ('spatialCover',spatialCover),
-                   ('count',10000)])
+    
+    
     
     # Loops over all the inputs
-    for reference_input in sys.stdin:
+    for input in sys.stdin:
+        
+        pa_series_identifier = input.rstrip()
+        ciop.log('DEBUG', 'current pa series identifier: %s' %pa_series_identifier)
+        
+        pa_name = str(config.get(pa_series_identifier, 'pa_name'))
+        pa_code = str(config.get(pa_series_identifier, 'pa_code'))
+        pa_wkt = str(config.get(pa_series_identifier, 'pa_wkt'))
+        spatialCover = str(config.get(pa_series_identifier, 'spatialCover'))
+        
+        params = dict([('start', start),
+                   ('stop', stop),
+                   ('spatialCover',spatialCover),
+                   ('count',10000)])
+        if time_filter_type == 'update':
+            params = dict([('update', '%s/%s' %(start,stop)),
+                   ('spatialCover',spatialCover),
+                   ('count',10000)])
+        
+        endpoint = '%s?geom=%s&correlatedTo=https://catalog.terradue.com/ecop-cnr-issia/series/pa/search?uid=%s&corFunction=spatial' %(base_endpoint,urllib.quote(pa_wkt),pa_series_identifier)
+        
         
         try:
-            references = ciop.search(reference_input, params = params, output_fields='self,wkt')
+
+            references = ciop.search(endpoint, params = params, output_fields='self,wkt')
+            
         except IndexError:
             ciop.log('INFO', 'No datasets found for %s' %reference_input)
             continue
         except Exception as e:
-            ciop.log('ERROR', 'An error occurred while looking for datasets into %s: \n %s' %(reference_input,e))
+            ciop.log('ERROR', 'An error occurred while looking for datasets over %s: \n %s' %(pa_series_identifier,e))
             raise SystemExit(ERR_GET_CAT)
     
         for ref in references:
@@ -457,12 +476,11 @@ def main():
             nb_source = os.path.join('/application', 'notebook', 'libexec', 'input.ipynb')
             nb_target = os.path.join(runtime, 'result.ipynb')
             
-            #ciop.log('INFO', 'unzipping dataset %s/%s.zip into %s/%s' %(runtime,identifiers[-1],runtime,identifiers[-1]))
-            #unzip('%s.zip' %identifiers[-1], '%s/%s'%(runtime,identifiers[-1]))
             
-            execute(identifiers[-1], reference, ref['wkt'], nb_source, nb_target, 'python2')
+            #ftp_server_basepath = 'sftp://frontend.recas.ba.infn.it/lustre/ecopotential/incoming/PAs'
+            ftp_server_address = 'sftp://%s%s' %(ftp_server, base_path)
             
-            #runtime = tmp_dir
+            execute(identifiers[-1], pa_series_identifier, ref['wkt'], pa_name, ftp_server_address, nb_source, nb_target, 'python2')
                 
             try:
                 # ecopotential publish consisting of cnr ftp uploading and atom publish on the related catalog index 
