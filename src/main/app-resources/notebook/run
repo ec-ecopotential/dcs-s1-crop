@@ -248,41 +248,41 @@ def update_atom(atom, hostname, remote_path, product):
                      
     my_target_enclosure = 'sftp://%s/%s/%s' %(hostname, remote_path, product)
     
-    new_identifier = os.path.splitext(product)[0]
+    identifier = os.path.splitext(product)[0]
     
-    ciop.log('DEBUG','new_identifier : %s' %new_identifier)
+    #ciop.log('DEBUG','new_identifier : %s' %new_identifier)
     
     root = etree.fromstring(atom)
     
     enclosure_elem = root.xpath('/a:feed/a:entry/a:link[@title="Download via Data Gateway"]', 
                              namespaces={'a':'http://www.w3.org/2005/Atom'})
 
-    eop_id_elem = root.xpath('/a:feed/a:entry/s:EarthObservation/e:metaDataProperty/e:EarthObservationMetaData/e:identifier', 
-                             namespaces={'a':'http://www.w3.org/2005/Atom',
-                                         'e':'http://www.opengis.net/eop/2.1',
-                                         's':'http://www.opengis.net/sar/2.1'})
+    #eop_id_elem = root.xpath('/a:feed/a:entry/s:EarthObservation/e:metaDataProperty/e:EarthObservationMetaData/e:identifier', 
+    #                         namespaces={'a':'http://www.w3.org/2005/Atom',
+    #                                     'e':'http://www.opengis.net/eop/2.1',
+    #                                     's':'http://www.opengis.net/sar/2.1'})
 
-    id_elem = root.xpath('/a:feed/a:entry/d:identifier', 
-                         namespaces={'a':'http://www.w3.org/2005/Atom',
-                                     'd':'http://purl.org/dc/elements/1.1/'})
+    #id_elem = root.xpath('/a:feed/a:entry/d:identifier', 
+    #                     namespaces={'a':'http://www.w3.org/2005/Atom',
+    #                                 'd':'http://purl.org/dc/elements/1.1/'})
 
     enclosure_elem[0].attrib['title'] =  'Download via %s server' %hostname
     enclosure_elem[0].attrib['href'] =  my_target_enclosure
     
-    eop_id_elem[0].text = new_identifier
+    #eop_id_elem[0].text = new_identifier
    
-    id_elem[0].text = new_identifier
+    #id_elem[0].text = new_identifier
 
-    ciop.log('INFO','ATOM UPDATED')
+    ciop.log('INFO','%s atom updated' %identifier)
     
     return etree.tostring(root, pretty_print=True)
     
     
 def catalog_publish(reference, product, index, hostname, remote_path, username, api_key):
-    
-    exit_v = 0   
+      
     ciop.log('DEBUG','product : %s' %product)
     ciop.log('DEBUG','reference : %s' %reference)
+    identifier = os.path.splitext(product)[0]
     try:
         atom = ciop.search(reference, params = [], output_fields='{}', model='EOP')
     except Exception as e:
@@ -301,14 +301,15 @@ def catalog_publish(reference, product, index, hostname, remote_path, username, 
                                      (username, api_key),
                                      headers)
     except Exception,e:
-        ciop.log('ERROR', 'An error occured while registering %s in the index %s: \n %s' % (new_identifier,index,e))
-        exit_v = 1
+        ciop.log('ERROR', 'An error occured while registering %s in the index %s: \n %s' % (identifier,index,e))
+        return 1
 
     if request_track.status_code != 200:
-        ciop.log('WARN', 'Atom registration for %s FAILED (%s)' % (new_identifier,request_track.status_code))
-        exit_v = 1
-    
-    return exit_v
+        ciop.log('WARN', 'Atom registration for %s FAILED (%s)' % (identifier,request_track.status_code))
+        return 1
+        
+    #ciop.log('INFO', '%s Atom registration : DONE ' % identifier)
+    return 0
 
     
 def ecop_publish(runtime, reference, ftp_server, ftp_user, ftp_passwd, base_path, pa_name, index, username, api_key):
@@ -355,13 +356,13 @@ def ecop_publish(runtime, reference, ftp_server, ftp_user, ftp_passwd, base_path
     files = [xml_path, zip_path]
         
     if sftp_upload(files, ftp_server, ftp_user, ftp_passwd, remote_path):
-        ciop.log('INFO','%s uploaded' % files)       
+        ciop.log('INFO','%s FTP publication : DONE' % product)       
         out = catalog_publish(reference, product, index, ftp_server, remote_path, username, api_key)
         if (out == 1):
-            ciop.log('ERROR','catalog publishing : FAILED')
+            ciop.log('ERROR','Catalog publication : FAILED')
             exit_value = 1
         else:
-            ciop.log('INFO','catalog publishing : DONE')
+            ciop.log('INFO','%s Catalog publication : DONE' %product)
     else:
         ciop.log('ERROR','%s NOT published' % zip_path)
         exit_value = 1
@@ -427,7 +428,7 @@ def main():
     for input in sys.stdin:
         
         pa_series_identifier = input.rstrip()
-        ciop.log('DEBUG', 'current pa series identifier: %s' %pa_series_identifier)
+        ciop.log('DEBUG', 'Current pa series identifier: %s' %pa_series_identifier)
         
         pa_name = str(config.get(pa_series_identifier, 'pa_name'))
         pa_code = str(config.get(pa_series_identifier, 'pa_code'))
@@ -445,24 +446,27 @@ def main():
         
         endpoint = '%s?geom=%s&correlatedTo=https://catalog.terradue.com/ecop-cnr-issia/series/pa/search?uid=%s&corFunction=spatial' %(base_endpoint,urllib.quote(pa_wkt),pa_series_identifier)
         
+        ciop.log('DEBUG', 'Querying catalog : %s ' %endpoint)
+        ciop.log('DEBUG', 'Using params :\n %s' %params)
         
         try:
 
             references = ciop.search(endpoint, params = params, output_fields='self,wkt')
             
         except IndexError:
-            ciop.log('INFO', 'No datasets found for %s' %reference_input)
+            ciop.log('INFO', 'NO DATASETS FOUND FOR %s' %pa_series_identifier)
             continue
         except Exception as e:
             ciop.log('ERROR', 'An error occurred while looking for datasets over %s: \n %s' %(pa_series_identifier,e))
             raise SystemExit(ERR_GET_CAT)
     
+        ciop.log('DEBUG', 'Found %s datasets over %s' %(len(references),pa_series_identifier))
         for ref in references:
 
             reference = ref['self']
             #if crop_flag is False no need to unxzip the dataset: it is uploaded as it is
             #ciop.log('INFO', 'downloading dataset (unzipping = %s)' %crop_flag)
-            ciop.log('INFO', 'downloading dataset %s' %reference)
+            ciop.log('INFO', 'Downloading dataset %s' %reference)
             stage_in(reference)
             
             runtime = os.path.join(ciop.tmp_dir, str(uuid.uuid4()))    
@@ -481,7 +485,8 @@ def main():
             ftp_server_address = 'sftp://%s%s' %(ftp_server, base_path)
             
             execute(identifiers[-1], pa_series_identifier, ref['wkt'], pa_name, ftp_server_address, nb_source, nb_target, 'python2')
-                
+            ciop.log('DEBUG', 'Notebook successfully executed for : %s' %identifiers[-1])
+            ciop.log('INFO', 'Starting publication for %s' %identifiers[-1])
             try:
                 # ecopotential publish consisting of cnr ftp uploading and atom publish on the related catalog index 
                 ecop_publish(runtime, reference, ftp_server, ftp_user, ftp_passwd, base_path, pa_name, cat_index, username, api_key)
@@ -491,6 +496,9 @@ def main():
             finally:
                 # clean-up 
                 clean_up(runtime)
+            ciop.log('INFO', '*********************************************************************************************************')
+            ciop.log('INFO', '****************** %s : DONE ******************' %identifiers[-1])
+            iop.log('INFO', '*********************************************************************************************************')
 
     # clean-up workspace folder
     ciop.log('DEBUG', 'Finally removing : %s' %os.path.split(tmp_dir)[0])
